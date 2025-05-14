@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 import httpx
 import os
 from datetime import datetime
@@ -15,7 +15,6 @@ HEADERS = {
     "Authorization": f"Api-Token {DYNATRACE_API_TOKEN}"
 }
 
-# Utility: Save data to file with timestamp and prefix
 def save_to_file(data: dict, prefix: str) -> str:
     timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
     file_path = f"{prefix}_{timestamp}_{OUTPUT_FILE}"
@@ -26,9 +25,17 @@ def save_to_file(data: dict, prefix: str) -> str:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+def build_url(base: str, path: str, query_params: dict) -> str:
+    if query_params:
+        query_string = "&".join(f"{key}={value}" for key, value in query_params.items())
+        return f"{base}{path}?{query_string}"
+    return f"{base}{path}"
+
+
 @router.get("/dynatrace/metrics")
-async def get_and_save_metrics():
-    url = f"{DYNATRACE_BASE_URL}/api/v2/metrics"
+async def get_metrics(request: Request):
+    url = build_url(DYNATRACE_BASE_URL, "/api/v2/metrics", dict(request.query_params))
 
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=HEADERS)
@@ -45,9 +52,10 @@ async def get_and_save_metrics():
         "record_count": len(data.get("metrics", []))
     }
 
+
 @router.get("/dynatrace/problems")
-async def get_and_save_problems():
-    url = f"{DYNATRACE_BASE_URL}/api/v2/problems"
+async def get_problems(request: Request):
+    url = build_url(DYNATRACE_BASE_URL, "/api/v2/problems", dict(request.query_params))
 
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=HEADERS)
@@ -61,12 +69,13 @@ async def get_and_save_problems():
     return {
         "message": "Problems data retrieved and saved",
         "file": file_path,
-        "record_count": len(data.get("problems", []))  # Adjust if needed
+        "record_count": len(data.get("problems", []))
     }
 
+
 @router.get("/dynatrace/events")
-async def get_and_save_events():
-    url = f"{DYNATRACE_BASE_URL}/api/v2/events"
+async def get_events(request: Request):
+    url = build_url(DYNATRACE_BASE_URL, "/api/v2/events", dict(request.query_params))
 
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=HEADERS)
@@ -80,12 +89,13 @@ async def get_and_save_events():
     return {
         "message": "Events data retrieved and saved",
         "file": file_path,
-        "record_count": len(data.get("events", []))  # Adjust if needed
+        "record_count": len(data.get("events", []))
     }
 
+
 @router.get("/dynatrace/topology")
-async def get_and_save_topology():
-    url = f"{DYNATRACE_BASE_URL}/api/v2/entities"
+async def get_topology(request: Request):
+    url = build_url(DYNATRACE_BASE_URL, "/api/v2/entities", dict(request.query_params))
 
     async with httpx.AsyncClient() as client:
         response = await client.get(url, headers=HEADERS)
